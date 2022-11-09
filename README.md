@@ -5,4 +5,4 @@ ngtor is an ngrok client that connects to ngrok over TOR, allowing one to host a
 2. Sign up for ngrok via TOR, get the auth token.
 3. Run `./ngtor <auth-token> <local-port>`
 
-ngtor does not utilize the official ngrok client and makes only one connection during its lifetime, a TLS connection to `tunnel.ngrok.com:443` over the TOR builtin socks5 proxy. The DNS request is proxied.
+ngtor does not utilize the official ngrok client and makes only one connection during its lifetime, a TLS connection to `tunnel.ngrok.com:443` over the TOR builtin socks5 proxy. The hostname is resolved through the proxy.
