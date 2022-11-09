@@ -38,7 +38,7 @@ func ngrokNew(token string, proxy_url string) (Ngrok, error) {
 	conn := tls.Client(raw_conn, &tls.Config{
 		InsecureSkipVerify: true,
 	})
-	sess := muxado.Client(io.ReadWriteCloser(conn), &muxado.Config{})
+	sess := muxado.Client(conn, &muxado.Config{})
 	this.sess = sess
 
 	return this, nil
@@ -110,7 +110,7 @@ func (this *Ngrok) bind() (string, error) {
 	return res.URL, nil
 }
 
-func receiveInfo2(sock net.Conn) (string, error) {
+func readInfo(sock net.Conn) (string, error) {
 	len_bytes := make([]byte, 8)
 	_, err := io.ReadFull(sock, len_bytes)
 	if err != nil {
@@ -181,7 +181,7 @@ func (this *Ngrok) accept() (net.Conn, string, error) {
 		return this.accept()
 	}
 
-	addr, err := receiveInfo2(conn)
+	addr, err := readInfo(conn)
 	if err != nil {
 		return nil, "", err
 	}
