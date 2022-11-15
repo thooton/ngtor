@@ -17,19 +17,17 @@ import (
 //lint:file-ignore ST1006 there is nothing wrong with 'this'
 
 type Ngrok struct {
-	token string
-	sess  muxado.Session
+	sess muxado.Session
 }
 
-func ngrokNew(token string, proxy_url string) (Ngrok, error) {
-	this := Ngrok{token, nil}
+func ngrokNew(proxy_url string) (Ngrok, error) {
+	this := Ngrok{}
 
 	dialer, err := proxy.SOCKS5("tcp", proxy_url, nil, proxy.Direct)
 	if err != nil {
 		return this, fmt.Errorf("couldn't create socks proxy dialer: %v", err)
 	}
 
-	// dns query is proxied
 	raw_conn, err := dialer.Dial("tcp", "tunnel.ngrok.com:443")
 	if err != nil {
 		return this, fmt.Errorf("couldn't connect to server: %v", err)
@@ -44,7 +42,7 @@ func ngrokNew(token string, proxy_url string) (Ngrok, error) {
 	return this, nil
 }
 
-func (this *Ngrok) authenticate() error {
+func (this *Ngrok) authenticate(token string) error {
 	conn, err := this.sess.Open()
 	if err != nil {
 		return fmt.Errorf("couldn't open auth session: %v", err)
@@ -53,7 +51,7 @@ func (this *Ngrok) authenticate() error {
 
 	conn.Write([]byte{0, 0, 0, 0})
 	conn.Write([]byte(`{"Version":["2"],"ClientId":"","Extra":{"OS":"windows","Arch":"amd64","Authtoken":"` +
-		this.token + `","Version":"3.1.0","Hostname":"tunnel.ngrok.com","UserAgent":"ngrok/3.1.0","Metadata":"","Cookie":"","HeartbeatInterval":10000000000,"HeartbeatTolerance":15000000000,"Fingerprint":null,"UpdateUnsupportedError":"","StopUnsupportedError":"","RestartUnsupportedError":"the ngrok agent does not support remote restarting on Windows","ProxyType":"none","MutualTLS":false,"ServiceRun":false,"ConfigVersion":"2","CustomInterface":false}}`))
+		token + `","Version":"3.1.0","Hostname":"tunnel.ngrok.com","UserAgent":"ngrok/3.1.0","Metadata":"","Cookie":"","HeartbeatInterval":10000000000,"HeartbeatTolerance":15000000000,"Fingerprint":null,"UpdateUnsupportedError":"","StopUnsupportedError":"","RestartUnsupportedError":"the ngrok agent does not support remote restarting on Windows","ProxyType":"none","MutualTLS":false,"ServiceRun":false,"ConfigVersion":"2","CustomInterface":false}}`))
 
 	bytes, _, err := bufio.NewReaderSize(conn, 1024).ReadLine()
 	if err != nil {
@@ -79,7 +77,7 @@ func (this *Ngrok) authenticate() error {
 	return nil
 }
 
-func (this *Ngrok) bind() (string, error) {
+func (this *Ngrok) bind(port int) (string, error) {
 	conn, err := this.sess.Open()
 	if err != nil {
 		return "", fmt.Errorf("couldn't open bind session: %v", err)
@@ -87,7 +85,7 @@ func (this *Ngrok) bind() (string, error) {
 	defer conn.Close()
 
 	conn.Write([]byte{0, 0, 0, 1})
-	conn.Write([]byte(`{"Id":"","Proto":"tcp","ForwardsTo":"localhost:80","Opts":{"Addr":"","ProxyProto":0,"IPRestriction":null,"ProtoMiddleware":false,"MiddlewareBytes":null},"Extra":{"Token":"","IPPolicyRef":"","Metadata":""}}`))
+	conn.Write([]byte(`{"Id":"","Proto":"tcp","ForwardsTo":"localhost:` + strconv.Itoa(port) + `","Opts":{"Addr":"","ProxyProto":0,"IPRestriction":null,"ProtoMiddleware":false,"MiddlewareBytes":null},"Extra":{"Token":"","IPPolicyRef":"","Metadata":""}}`))
 
 	bytes, _, err := bufio.NewReaderSize(conn, 1024).ReadLine()
 	if err != nil {
@@ -174,10 +172,10 @@ func (this *Ngrok) accept() (net.Conn, string, error) {
 	}
 
 	if is_heartbeat {
-		go func(conn net.Conn) {
+		go func() {
 			io.Copy(conn, conn)
 			conn.Close()
-		}(conn)
+		}()
 		return this.accept()
 	}
 
